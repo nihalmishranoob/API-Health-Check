@@ -1,0 +1,401 @@
+@model ApiHealthDashboard.Models.IndexViewModel
+@using ApiHealthDashboard.Models
+
+@{
+    ViewData["Title"] = "API Health Check";
+    var m = Model.Result;
+    var hasResult = m != null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>APIPulse — Health Check</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=DM+Sans:wght@400;500;700;900&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg:       #f5f4f0;
+            --surface:  #ffffff;
+            --border:   #e0ddd6;
+            --ink:      #1a1814;
+            --muted:    #8c8880;
+            --green:    #1a7a4a;
+            --green-bg: #eaf7f0;
+            --red:      #c0392b;
+            --red-bg:   #fdf0ee;
+            --yellow:   #9a6f00;
+            --yellow-bg:#fdf8ec;
+            --radius:   4px;
+            --mono:     'IBM Plex Mono', monospace;
+            --sans:     'DM Sans', sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--ink);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            border-bottom: 2px solid var(--ink);
+            background: var(--surface);
+            padding: 0 48px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo { display: flex; align-items: baseline; gap: 6px; }
+        .logo-mark { font-family: var(--mono); font-weight: 600; font-size: 1.15rem; letter-spacing: -1px; }
+        .logo-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--ink);
+            display: inline-block; margin-bottom: 2px;
+            animation: breathe 2.4s ease-in-out infinite;
+        }
+        @@keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.7)} }
+        .logo-sub { font-size: 0.7rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; font-weight: 500; }
+        .header-time { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+
+        main { flex:1; max-width: 760px; width: 100%; margin: 0 auto; padding: 56px 24px 80px; }
+
+        .hero { margin-bottom: 48px; }
+        .hero h1 { font-size: 2.6rem; font-weight: 900; letter-spacing: -1.5px; line-height: 1.05; margin-bottom: 10px; }
+        .hero p { color: var(--muted); font-size: 1rem; }
+
+        .form-card {
+            background: var(--surface);
+            border: 2px solid var(--ink);
+            border-radius: var(--radius);
+            padding: 32px;
+            margin-bottom: 40px;
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        .field-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
+
+        input[type="text"], input[type="url"] {
+            width: 100%; padding: 13px 16px;
+            font-family: var(--mono); font-size: 0.88rem; color: var(--ink);
+            background: var(--bg); border: 1.5px solid var(--border);
+            border-radius: var(--radius); outline: none; transition: border-color 0.15s;
+        }
+        input[type="text"]:focus, input[type="url"]:focus { border-color: var(--ink); }
+        input::placeholder { color: var(--muted); }
+
+        .form-row { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 20px; }
+
+        .validation-error {
+            color: var(--red); font-size: 0.78rem; margin-top: 6px;
+            font-family: var(--mono); padding: 8px 12px;
+            background: var(--red-bg); border-radius: var(--radius);
+            border: 1px solid var(--red);
+        }
+
+        .btn-run {
+            width: 100%; padding: 15px;
+            background: var(--ink); color: var(--bg);
+            border: 2px solid var(--ink); border-radius: var(--radius);
+            font-family: var(--sans); font-weight: 700; font-size: 0.95rem;
+            cursor: pointer; transition: background 0.15s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-run:hover { background: #3a3530; }
+        .btn-run:active { transform: translate(2px, 2px); }
+
+        .results { animation: fadeUp 0.35s ease; }
+        @@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+        .status-banner {
+            border: 2px solid; border-radius: var(--radius);
+            padding: 24px 28px; margin-bottom: 28px;
+            display: flex; align-items: center; gap: 20px;
+        }
+        .status-banner.healthy  { background: var(--green-bg); border-color: var(--green); box-shadow: 4px 4px 0 var(--green); }
+        .status-banner.unhealthy{ background: var(--red-bg);   border-color: var(--red);   box-shadow: 4px 4px 0 var(--red); }
+
+        .banner-icon { font-size: 2rem; line-height: 1; }
+        .banner-text h2 { font-size: 1.4rem; font-weight: 900; letter-spacing: -0.5px; }
+        .banner-text .banner-sub { font-size: 0.82rem; font-family: var(--mono); margin-top: 2px; }
+        .healthy   .banner-text h2         { color: var(--green); }
+        .healthy   .banner-text .banner-sub { color: #2d9e6a; }
+        .unhealthy .banner-text h2         { color: var(--red); }
+        .unhealthy .banner-text .banner-sub { color: var(--red); }
+        .banner-time { margin-left: auto; text-align: right; font-family: var(--mono); font-size: 0.72rem; color: var(--muted); line-height: 1.6; }
+
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+        .metric-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 20px 22px; }
+        .metric-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+        .metric-value { font-size: 1.9rem; font-weight: 900; letter-spacing: -1px; line-height: 1; }
+        .metric-sub   { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+
+        .c-green  { color: var(--green); }
+        .c-red    { color: var(--red); }
+        .c-yellow { color: var(--yellow); }
+        .c-muted  { color: var(--muted); }
+
+        .latency-bar-wrap { margin-top: 8px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+        .latency-fill { height: 100%; border-radius: 3px; transition: width 0.6s cubic-bezier(.22,.68,0,1.2); }
+
+        .detail-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .detail-card table { width: 100%; border-collapse: collapse; }
+        .detail-card th {
+            background: var(--bg); padding: 11px 20px; text-align: left;
+            font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--muted); font-weight: 700; border-bottom: 1.5px solid var(--border);
+        }
+        .detail-card td { padding: 14px 20px; font-size: 0.88rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        .detail-card tr:last-child td { border-bottom: none; }
+        .check-name   { font-weight: 600; }
+        .check-detail { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
+
+        .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.73rem; font-weight: 700; font-family: var(--mono); }
+        .pill-pass { background: var(--green-bg); color: var(--green); }
+        .pill-fail { background: var(--red-bg);   color: var(--red); }
+        .pill-warn { background: var(--yellow-bg);color: var(--yellow); }
+        .pill-na   { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+
+        .error-box { background: var(--red-bg); border: 1.5px solid var(--red); border-radius: var(--radius); padding: 14px 18px; margin-top: 16px; font-family: var(--mono); font-size: 0.78rem; color: var(--red); word-break: break-all; }
+
+        .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(245,244,240,0.85); backdrop-filter: blur(3px); z-index: 200; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+        .loading-overlay.active { display: flex; }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--ink); border-radius: 50%; animation: spin 0.75s linear infinite; }
+        @@keyframes spin { to { transform: rotate(360deg); } }
+        .loading-label { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+
+        @@media (max-width: 600px) {
+            header { padding: 0 20px; }
+            main { padding: 36px 16px 60px; }
+            .hero h1 { font-size: 1.9rem; }
+            .form-row { grid-template-columns: 1fr; }
+            .metrics-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-label">Checking endpoint...</div>
+</div>
+
+<header>
+    <div class="logo">
+        <span class="logo-mark">APIPulse</span>
+        <span class="logo-dot"></span>
+        <span class="logo-sub">Health Monitor</span>
+    </div>
+    <div class="header-time" id="clock"></div>
+</header>
+
+<main>
+
+    <div class="hero">
+        <h1>Check an<br/>API endpoint.</h1>
+        <p>Enter a URL and get instant health diagnostics — status, latency, and JSON validity.</p>
+    </div>
+
+    <div class="form-card">
+        <form method="post" action="/" id="checkForm">
+            @Html.AntiForgeryToken()
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="Label">Label <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+                    <input type="text" id="Label" name="Label"
+                           placeholder="e.g. Prod API"
+                           value="@Model.Request.Label" />
+                </div>
+                <div class="field-group">
+                    <label for="Url">Endpoint URL *</label>
+                    <input type="url" id="Url" name="Url"
+                           placeholder="https://api.example.com/health"
+                           value="@Model.Request.Url"
+                           required />
+                </div>
+            </div>
+
+            @if (Model.ErrorMessage != null)
+            {
+                <div class="validation-error">&#9888; @Model.ErrorMessage</div>
+            }
+
+            <button type="submit" class="btn-run" style="margin-top:20px" id="runBtn">
+                <span id="btnText">&#9654; Run Health Check</span>
+            </button>
+        </form>
+    </div>
+
+    @if (hasResult && m != null)
+    {
+        var latencyPct   = m.ResponseTimeMs >= 0 ? (int)Math.Min(100, m.ResponseTimeMs / 3000.0 * 100) : 0;
+        var latencyColor = m.ResponseTimeMs < 200 ? "var(--green)" : m.ResponseTimeMs < 500 ? "var(--yellow)" : "var(--red)";
+
+        <div class="results">
+
+            <div class="status-banner @(m.IsHealthy ? "healthy" : "unhealthy")">
+                <div class="banner-icon">@(m.IsHealthy ? "&#10003;" : "&#10007;")</div>
+                <div class="banner-text">
+                    <h2>@(m.IsHealthy ? "Healthy" : "Unhealthy")</h2>
+                    <div class="banner-sub">@(string.IsNullOrWhiteSpace(m.Label) ? m.Url : m.Label)</div>
+                </div>
+                <div class="banner-time">
+                    @m.CheckedAt.ToUniversalTime().AddHours(5).AddMinutes(30).ToString("HH:mm:ss 'IST'")<br/>
+                    @m.CheckedAt.ToString("dd MMM yyyy")
+                </div>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">HTTP Status</div>
+                    @if (m.StatusCode.HasValue)
+                    {
+                        <div class="metric-value @(m.IsStatusHealthy ? "c-green" : "c-red")">@m.StatusCode</div>
+                        <div class="metric-sub">@(m.IsStatusHealthy ? "Success range" : "Non-2xx response")</div>
+                    }
+                    else
+                    {
+                        <div class="metric-value c-red">ERR</div>
+                        <div class="metric-sub">No response received</div>
+                    }
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Latency</div>
+                    @if (m.ResponseTimeMs >= 0)
+                    {
+                        <div class="metric-value" style="color:@latencyColor">
+                            @m.ResponseTimeMs<span style="font-size:1rem;font-weight:500;color:var(--muted)"> ms</span>
+                        </div>
+                        <div class="metric-sub">@(m.IsResponseTimeFast ? "Under 500 ms — fast" : "Over 500 ms — slow")</div>
+                        <div class="latency-bar-wrap">
+                            <div class="latency-fill" style="width:@(latencyPct)%;background:@latencyColor"></div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="metric-value c-muted">&#8212;</div>
+                        <div class="metric-sub">Could not measure</div>
+                    }
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">JSON Body</div>
+                    @if (m.IsValidJson == true)
+                    {
+                        <div class="metric-value c-green">&#10003;</div>
+                        <div class="metric-sub">Valid JSON response</div>
+                    }
+                    else if (m.IsValidJson == false)
+                    {
+                        <div class="metric-value c-red">&#10007;</div>
+                        <div class="metric-sub">Invalid JSON</div>
+                    }
+                    else
+                    {
+                        <div class="metric-value c-muted">&#8212;</div>
+                        <div class="metric-sub">Not a JSON endpoint</div>
+                    }
+                </div>
+            </div>
+
+            <div class="detail-card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Check</th>
+                            <th>Detail</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div class="check-name">HTTP Status Code</div>
+                                <div class="check-detail">Expects 200&#8211;299</div>
+                            </td>
+                            <td class="check-detail">@(m.StatusCode.HasValue ? $"Received {m.StatusCode}" : "No response received")</td>
+                            <td>
+                                @if (m.StatusCode.HasValue && m.IsStatusHealthy)
+                                { <span class="pill pill-pass">&#10003; Pass</span> } @*&#10003; pass*@
+                                else if (m.StatusCode.HasValue)
+                                { <span class="pill pill-fail">&#10007; Fail</span> } @*&#10007; fail*@
+                                else
+                                { <span class="pill pill-fail">&#10007; Error</span> }
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="check-name">Response Time</div>
+                                <div class="check-detail">Threshold &lt; 500 ms</div>
+                            </td>
+                            <td class="check-detail">@(m.ResponseTimeMs >= 0 ? $"{m.ResponseTimeMs} ms end-to-end" : "Could not measure")</td>
+                            <td>
+                                @if (m.ResponseTimeMs < 0)
+                                { <span class="pill pill-na">N/A</span> }
+                                else if (m.IsResponseTimeFast)
+                                { <span class="pill pill-pass">&#10003; Fast</span> }
+                                else
+                                { <span class="pill pill-warn">&#9888; Slow</span> } @*&#9888; warning*@
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="check-name">JSON Validity</div>
+                                <div class="check-detail">Only for application/json responses</div>
+                            </td>
+                            <td class="check-detail">
+                                @if (m.IsValidJson == true)      { <text>Body parsed successfully</text> }
+                                else if (m.IsValidJson == false) { <text>Body failed JSON parsing</text> }
+                                else                             { <text>Content-Type is not JSON</text> }
+                            </td>
+                            <td>
+                                @if (m.IsValidJson == true)
+                                { <span class="pill pill-pass">&#10003; Valid</span> }
+                                else if (m.IsValidJson == false)
+                                { <span class="pill pill-fail">&#10007; Invalid</span> }
+                                else
+                                { <span class="pill pill-na">N/A</span> }
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            @if (m.ErrorMessage != null)
+            {
+                <div class="error-box">&#9888; @m.ErrorMessage</div>
+            }
+
+        </div>
+    }
+
+</main>
+
+<script>
+    function updateClock() {
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        // IST = UTC + 5:30
+        const istMs = now.getTime() + (5 * 60 + 30) * 60 * 1000;
+        const ist = new Date(istMs);
+        document.getElementById('clock').textContent =
+            `${pad(ist.getUTCHours())}:${pad(ist.getUTCMinutes())}:${pad(ist.getUTCSeconds())} IST`;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    document.getElementById('checkForm').addEventListener('submit', function () {
+        document.getElementById('loadingOverlay').classList.add('active');
+        document.getElementById('btnText').textContent = 'Checking...';
+    });
+</script>
+</body>
+</html>
